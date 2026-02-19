@@ -1,0 +1,141 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity bootloader_tb is
+end bootloader_tb;
+
+architecture sim of bootloader_tb is
+
+-- CLOCK / RESET
+
+signal clk : std_logic := '0';
+signal rst : std_logic := '1';
+
+
+-- AXI Signals
+
+
+-- ROM
+signal rom_araddr  : std_logic_vector(31 downto 0);
+signal rom_arvalid : std_logic;
+signal rom_rdata   : std_logic_vector(31 downto 0);
+signal rom_rvalid  : std_logic;
+signal rom_rready  : std_logic;
+
+-- RAM
+signal ram_awaddr : std_logic_vector(31 downto 0);
+signal ram_wdata  : std_logic_vector(31 downto 0);
+signal ram_wvalid : std_logic;
+signal ram_bvalid : std_logic;
+signal ram_bready : std_logic;
+
+-- CPU
+signal cpu_ready : std_logic;
+
+
+-- MEMORY MODELS
+
+
+type rom_type is array(0 to 255) of std_logic_vector(31 downto 0);
+type ram_type is array(0 to 255) of std_logic_vector(31 downto 0);
+
+signal ROM : rom_type := (
+    0 => x"AAAAAAAA",
+    1 => x"BBBBBBBB",
+    2 => x"CCCCCCCC",
+    3 => x"DDDDDDDD",
+    others => x"00000000"
+);
+
+signal RAM : ram_type := (others => x"00000000");
+
+
+-- DUT
+
+begin
+
+DUT: entity work.bootloader
+generic map(
+    PROGRAM_SIZE => 4
+)
+port map(
+
+    clk => clk,
+    rst => rst,
+
+    rom_araddr  => rom_araddr,
+    rom_arvalid => rom_arvalid,
+    rom_rdata   => rom_rdata,
+    rom_rvalid  => rom_rvalid,
+    rom_rready  => rom_rready,
+
+    ram_awaddr => ram_awaddr,
+    ram_wdata  => ram_wdata,
+    ram_wvalid => ram_wvalid,
+    ram_bvalid => ram_bvalid,
+    ram_bready => ram_bready,
+
+    cpu_ready => cpu_ready
+);
+
+
+-- CLOCK
+
+clk <= not clk after 5 ns;
+
+
+-- RESET
+
+process
+begin
+    wait for 20 ns;
+    rst <= '0';
+    wait;
+end process;
+
+
+-- ROM MODEL (READ)
+
+process(clk)
+begin
+if rising_edge(clk) then
+
+    if rom_arvalid = '1' then
+
+        rom_rdata <= ROM(
+            to_integer(unsigned(rom_araddr(9 downto 2)))
+        );
+
+        rom_rvalid <= '1';
+
+    elsif rom_rready = '1' then
+        rom_rvalid <= '0';
+    end if;
+
+end if;
+end process;
+
+
+-- RAM MODEL (WRITE
+)
+process(clk)
+begin
+if rising_edge(clk) then
+
+    if ram_wvalid = '1' then
+
+        RAM(
+          to_integer(unsigned(ram_awaddr(9 downto 2)))
+        ) <= ram_wdata;
+
+        ram_bvalid <= '1';
+
+    elsif ram_bready = '1' then
+        ram_bvalid <= '0';
+    end if;
+
+end if;
+end process;
+
+end sim;
